@@ -1,0 +1,37 @@
+; CONSTANTS
+; Keccakf-rounds 24 (n)
+
+(fn round (state)
+    (let (c vempty)
+        ; Theta-step
+        ; for-loop
+        (let (i 0) (loop 5 (let ()
+            (vpush c
+                (xor (get state (+ i 5))
+                     (get state (+ i 10))
+                     (get state (+ i 15))
+                     (get state (+ i 20))))
+            (set! i (+ i 1)))))
+        (let (i 0) (loop 5
+            (let (t (xor (get c (% (+ i 4) 5))
+                         (rotl64 (get c (% (+ i 1) 5)))))
+                ; for(j = 0; j < 25; j += 5)
+                (let (j 0) (loop 5 (let ()
+                    (vfrom state (+ j i)
+                        (xor (get state i) t)
+                    (set! j (+ j 5)))))))
+            (set! i (+ i 1))))
+        (let (i 0) (loop 25 (let ()
+            (vfrom state i
+                (xor (get state i)
+                     (get d (% x 5)))))))
+        ; Rho and pi steps
+        ; Chi step
+
+
+; Keccak-f[1600]
+; f is the permutation which transforms the sponge construction
+(fn keccak-f (state)
+    (let (i 0)
+        (loop 24 (round state)))
+    state)
