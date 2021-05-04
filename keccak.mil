@@ -19,17 +19,17 @@
                 27 41 56 8  25 43 62 18 39 61 20 44])
           ;piln [10 7 11 17 18 3 5 16 8 21 24 4
           ;      15 23 19 13 12 2 20 14 22 9 6 1])
+
         ; Theta-step
         ; ----
-
-        ; for-loop
         (let (i 0) (loop 5 (let ()
-            (v-push c
-                (xor (xor (xor
-                  (v-get state (+ i 5))
-                  (v-get state (+ i 10)))
-                  (v-get state (+ i 15)))
-                  (v-get state (+ i 20))))
+            (set! c
+                (v-push c
+                    (xor (xor (xor
+                      (v-get state (+ i 5))
+                      (v-get state (+ i 10)))
+                      (v-get state (+ i 15)))
+                      (v-get state (+ i 20)))))
             (set! i (+ i 1)))))
         (let (i 0) (loop 5
             (let (t (xor (v-get c (% (+ i 4) 5))
@@ -40,22 +40,9 @@
                             (xor (v-get state (+ j i)) t)))
                     (set! j (+ j 5)))))
             (set! i (+ i 1)))))
-        ;(let (i 0) (loop 25 (let ()
-            ;(vfrom state i
-                ;(xor (v-get state i)
-                     ;(v-get d (% x 5)))))))
 
         ; Rho and pi steps
         ; ----
-
-        ; start at (1,0)
-        ;(let (current (v-get state 1))
-        ;    (let (i 0) (loop 25
-        ;        (let (j (v-get piln i)
-        ;              bc0 (v-get state j))
-        ;            (set! state (v-from state j (rotl64 current (v-get rotc i))))
-        ;            (set! current bc0)
-        ;            (set! i (+ i 2))))))))
         (let (current (v-get state 1)
               x 1
               y 0)
@@ -98,4 +85,4 @@
             (loop 24 (state-permute state)))
         state))
 
-(keccak-f 0)
+(keccak-f [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0])
