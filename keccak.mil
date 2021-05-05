@@ -9,12 +9,6 @@
         byte-chunk)
         (b-slice bytes end (- (b-len bytes) 1))))
 
-; load64 : [u8; 8] -> U256
-;(fn bytes->u64 (bytes)
-;    (let (sum 0 i 0) (loop 8
-;        (set! sum
-;            (+ sum (<< (b-get bytes i) (* i 8)))))))
-
 ; store64 : U256 -> [u8; 8]
 (fn u64->bytes (n)
     (let (bytes (u256->bytes n))
@@ -146,7 +140,6 @@
     state-cpy))
 
 ; Each U256 is used only for its first 64 bits
-;(keccak-f [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]) ; 25
 (let (rate 1088
       ; rate-in-bytes = rate / 8
       rate-in-bytes 136
@@ -157,6 +150,10 @@
       input-bytes SELF-DATA
       delimited-suffix 0x06
       output-byte-len 32)
+
+    ; Absorb input
+    ; ------------
+
     ; Theoretically, input is arbitrarily large, but this loop must be bounded
     (loop 10
         (if (< input-offset (b-len input-bytes))
@@ -187,4 +184,13 @@
                 (set! input-offset (+ input-offset rate-in-bytes)))))
             ; else done processing input
             0 ; should be a noop
-            )))
+            ))
+
+    ; Squeeze Output
+    ; ------------
+
+    (set! state (keccak state))
+    ; Output is a 256-bit hash.
+    ; len is rate-in-bytes + 120 = 256
+    (b-concat state (b-slice (keccak state) 0 120))
+)
