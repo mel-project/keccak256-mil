@@ -1,6 +1,29 @@
 ; CONSTANTS
 ; Keccakf-rounds 24 (n)
 
+; Remove chunk of "bytes" from begin to end, and replace
+; with byte-chunk
+(fn splice (bytes byte-chunk begin end)
+    (b-concat (b-concat
+        (b-slice bytes 0 begin)
+        byte-chunk)
+        (b-slice bytes end (- (b-len bytes) 1))))
+
+; load64 : [u8; 8] -> U256
+;(fn bytes->u64 (bytes)
+;    (let (sum 0 i 0) (loop 8
+;        (set! sum
+;            (+ sum (<< (b-get bytes i) (* i 8)))))))
+
+; store64 : U256 -> [u8; 8]
+(fn u64->bytes (n)
+    (let (bytes (u256->bytes n))
+        (b-slice 0 8 bytes)))
+
+; minimum between two numbers
+(fn min (x y)
+    (if (< x y) x y))
+
 ; map a 2d (x,y) coordinate of a state vector to 1d index
 (fn lane-idx (x y)
     (+ x (* y 5)))
@@ -12,7 +35,7 @@
     ;((a >> (64-(n%64))) + (a << (n%64))) % (1 << 64)
 
 ; Compute the keccak-f[1600] permutation given the state
-(fn state-permute (state)
+(fn state-permute-round! (state round)
     (let (c v-nil
           ; rotation constants
           rotc [1 3 6 10 15 21 28 36 45 55 2 14
@@ -74,15 +97,94 @@
                                           (v-get temp (% (+ x 2) 5))))))
                     (set! x (+ x 1)))))
                 (set! y (+ y 1)))))
+
+        ; Iota step
+        (let (rc [1 32898 9223372036854808714 9223372039002292224 32907 2147483649 9223372039002292353
+                  9223372036854808585 138 136 2147516425 2147483658 2147516555 9223372036854775947
+                  9223372036854808713 9223372036854808579 9223372036854808578 9223372036854775936 32778
+                  9223372039002259466 9223372039002292353 9223372036854808704 2147483649 9223372039002292232])
+            (v-from state 0
+                (xor (v-get state 0)
+                     (v-get rc round))))
 ))
 
 
 ; Keccak-f[1600]
 ; f is the permutation which transforms the sponge construction
-(fn keccak-f (state)
-    (let ()
-        (let (i 0)
-            (loop 24 (state-permute state)))
-        state))
+; keccak-f-on-lanes : mut [U256; 25]
+(fn keccak-f-on-lanes! (state)
+    (let (round 0)
+        (loop 24 (state-permute-round! state round))
+        (set! round (+ round 1))))
 
-(keccak-f [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0])
+; keccak : [Bytes] -> [Bytes]
+(fn keccak (state-bytes)
+    (let (state-cpy state-bytes ; copy to not mutate state-bytes directly
+          lanes v-nil
+          x 0) (loop 5
+        ; set lanes from state-bytes
+        (let (y 0) (loop 5
+            (set! lanes
+                (v-push lanes
+                    ; load 8 bytes (64 bits) into a U256
+                    (bytes->u256 (b-slice state-bytes
+                        (* 8 (lane-idx x y))
+                        (+ 8 (* 8 (lane-idx x y))))))))))
+
+        ; Perform keccak, mutating lanes
+        (keccak-f-on-lanes! lanes)
+
+        ; Load state back into bytes
+        (let (x 0) (loop 5
+            (let (y 0) (loop 5
+                (set! state-cpy
+                    (splice state-bytes
+                            (u64->bytes (v-get lanes (lane-idx x y)))
+                            (* 8 (lane-idx x y))
+                            (+ 8 (* 8 (lane-idx x y)))))))))
+    ; Return new state
+    state-cpy))
+
+; Each U256 is used only for its first 64 bits
+;(keccak-f [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]) ; 25
+(let (rate 1088
+      ; rate-in-bytes = rate / 8
+      rate-in-bytes 136
+      capacity 512
+      ; 200 bytes
+      state 0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+      input-offset 0
+      input-bytes SELF-DATA
+      delimited-suffix 0x06
+      output-byte-len 32)
+    ; Theoretically, input is arbitrarily large, but this loop must be bounded
+    (loop 10
+        (if (< input-offset (b-len input-bytes))
+            ; for i in 0..rate-in-bytes
+            (let (last-block? (< (+ input-offset rate-in-bytes) (b-len input-bytes))
+                  i 0) (loop 136 (let ()
+                (if (not last-block?)
+                    ; if not the last block, process a whole block
+                    ; state[i] = state[i] ^ input-bytes[i + input-offset]
+                    (set! state
+                        (v-from state i
+                            (xor (b-get state i)
+                                 (b-get input-bytes (+ i input-offset)))))
+
+                    ; otherwise, process whats left of the input with padding
+                    (let (blocksize (- (b-len input-bytes) input-offset))
+                        ; state[blocksize] = state[blocksize] ^ delimited-suffix
+                        (set! state
+                            (b-from state blocksize
+                                (xor (b-get state blocksize)
+                                     delimited-suffix)))
+                        ; state[rate-in-bytes] = state[rate-in-bytes] ^ 0x80
+                        (set! state
+                            (b-from state blocksize
+                                (xor (b-get state blocksize) 0x80)))
+                        (set! state (keccak state))))
+
+                (set! input-offset (+ input-offset rate-in-bytes)))))
+            ; else done processing input
+            0 ; should be a noop
+            )))
