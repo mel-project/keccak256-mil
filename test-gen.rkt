@@ -11,7 +11,8 @@
     0
     "6d"
     ; additional data
-    ""))
+    ;"0000000000000000000000000000000000000000000000000000000000000000"))
+    "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"))
 
 
 (let ([covhash (read-line (current-input-port))])
@@ -27,8 +28,11 @@
         (header-default))
       (Transaction
         0 ; kind
+        ; inputs
         (list (coinid0 covhash))
-        (list (coindata0 covhash))
+        ; outputs
+        (list)
+        ;(list (coindata0 covhash))
         0 ; fee
         (list) ; scripts
         ; data

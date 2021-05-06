@@ -109,21 +109,22 @@
 (fn keccak-f-on-lanes! (state)
     (let (round 0)
         (loop 24 (state-permute-round! state round))
+        ;(state-permute-round! state round))
         (set! round (+ round 1))))
 
 ; keccak : [Bytes] -> [Bytes]
 (fn keccak (state-bytes)
     (let (state-cpy state-bytes ; copy to not mutate state-bytes directly
           lanes v-nil
-          x 0) (loop 5
+          x 0) ;(loop 5
         ; set lanes from state-bytes
-        (let (y 0) (loop 5
+        (let (y 0) ;(loop 5
             (set! lanes
                 (v-push lanes
                     ; load 8 bytes (64 bits) into a U256
                     (bytes->u256 (b-slice state-bytes
                         (* 8 (lane-idx x y))
-                        (+ 8 (* 8 (lane-idx x y))))))))))
+                        (+ 8 (* 8 (lane-idx x y))))))));))
 
         ; Perform keccak, mutating lanes
         (keccak-f-on-lanes! lanes)
@@ -155,18 +156,21 @@
     ; ------------
 
     ; Theoretically, input is arbitrarily large, but this loop must be bounded
-    (loop 10
+    ;(loop 10
         (if (< input-offset (b-len input-bytes))
             ; for i in 0..rate-in-bytes
             (let (last-block? (< (+ input-offset rate-in-bytes) (b-len input-bytes))
-                  i 0) (loop 136 (let ()
+                  i 0) ;(loop 136
+                  (let ()
                 (if (not last-block?)
                     ; if not the last block, process a whole block
-                    ; state[i] = state[i] ^ input-bytes[i + input-offset]
-                    (set! state
-                        (v-from state i
-                            (xor (b-get state i)
-                                 (b-get input-bytes (+ i input-offset)))))
+                    (let ()
+                        ; state[i] = state[i] ^ input-bytes[i + input-offset]
+                        (set! state
+                            (b-from state i
+                                (xor (b-get state i)
+                                     (b-get input-bytes (+ i input-offset)))))
+                        (set! state (keccak state)))
 
                     ; otherwise, process whats left of the input with padding
                     (let (blocksize (- (b-len input-bytes) input-offset))
@@ -181,10 +185,10 @@
                                 (xor (b-get state blocksize) 0x80)))
                         (set! state (keccak state))))
 
-                (set! input-offset (+ input-offset rate-in-bytes)))))
+                (set! input-offset (+ input-offset rate-in-bytes))));)
             ; else done processing input
             0 ; should be a noop
-            ))
+    );)
 
     ; Squeeze Output
     ; ------------
