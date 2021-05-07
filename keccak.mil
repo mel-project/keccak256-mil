@@ -9,10 +9,16 @@
         byte-chunk)
         (b-slice bytes end (- (b-len bytes) 1))))
 
-; store64 : U256 -> [u8; 8]
+; u64->bytes : U256 -> [u8; 8]
 (fn u64->bytes (n)
     (let (bytes (u256->bytes n))
-        (b-slice 0 8 bytes)))
+        (b-slice bytes 0 8)))
+
+; bytes->u64 : [u8] -> U256
+(fn bytes->u64 (bytes)
+    (let (sum 0 i 0) (loop 8
+        (set! sum (+ sum (* (* i 2) (b-get bytes i)))))
+    sum))
 
 ; minimum between two numbers
 (fn min (x y)
@@ -39,7 +45,8 @@
 
         ; Theta-step
         ; ----
-        (let (i 0) (loop 5 (let ()
+        (let (i 0) (loop 5
+            (let ()
             (set! c
                 (v-push c
                     (xor (xor (xor
@@ -109,22 +116,22 @@
 (fn keccak-f-on-lanes! (state)
     (let (round 0)
         (loop 24 (state-permute-round! state round))
-        ;(state-permute-round! state round))
+        ;(state-permute-round! state round)
         (set! round (+ round 1))))
 
 ; keccak : [Bytes] -> [Bytes]
 (fn keccak (state-bytes)
     (let (state-cpy state-bytes ; copy to not mutate state-bytes directly
-          lanes v-nil
-          x 0) ;(loop 5
+          lanes v-nil)
         ; set lanes from state-bytes
-        (let (y 0) ;(loop 5
+        (let (x 0) (loop 5
+            (let (y 0) (loop 5
             (set! lanes
                 (v-push lanes
                     ; load 8 bytes (64 bits) into a U256
-                    (bytes->u256 (b-slice state-bytes
+                    (bytes->u64 (b-slice state-bytes
                         (* 8 (lane-idx x y))
-                        (+ 8 (* 8 (lane-idx x y))))))));))
+                        (+ 8 (* 8 (lane-idx x y)))))))))))
 
         ; Perform keccak, mutating lanes
         (keccak-f-on-lanes! lanes)
