@@ -124,26 +124,31 @@
     (let (state-cpy state-bytes ; copy to not mutate state-bytes directly
           lanes v-nil)
         ; set lanes from state-bytes
-        (let (x 0) (loop 5
-            (let (y 0) (loop 5
-            (set! lanes
-                (v-push lanes
-                    ; load 8 bytes (64 bits) into a U256
-                    (bytes->u64 (b-slice state-bytes
-                        (* 8 (lane-idx x y))
-                        (+ 8 (* 8 (lane-idx x y)))))))))))
+        (let (x 0) (loop 5 (let ()
+            (let (y 0) (loop 5 (let ()
+                (set! lanes
+                    (v-push lanes
+                        ; load 8 bytes (64 bits) into a U256
+                        (bytes->u64 (b-slice state-bytes
+                            (* 8 (lane-idx x y))
+                            (+ 8 (* 8 (lane-idx x y)))))))
+                (set! y (+ y 1)))))
+            (set! x (+ x 1)))))
 
         ; Perform keccak, mutating lanes
         (keccak-f-on-lanes! lanes)
 
         ; Load state back into bytes
-        (let (x 0) (loop 5
-            (let (y 0) (loop 5
+        (let (x 0) (loop 5 (let ()
+            (let (y 0) (loop 5 (let ()
                 (set! state-cpy
                     (splice state-bytes
                             (u64->bytes (v-get lanes (lane-idx x y)))
                             (* 8 (lane-idx x y))
-                            (+ 8 (* 8 (lane-idx x y)))))))))
+                            (+ 8 (* 8 (lane-idx x y)))))
+                (set! y (+ y 1)))))
+            (set! x (+ x 1)))))
+
     ; Return new state
     state-cpy))
 
@@ -167,14 +172,15 @@
         (if (< input-offset (b-len input-bytes))
             ; for i in 0..rate-in-bytes
             (let (last-block? (< (+ input-offset rate-in-bytes) (b-len input-bytes))
-                  i 0) ;(loop 136
-                  (let ()
+                  i 0)
+                (loop 136 (let ()
                 (if (not last-block?)
                     ; if not the last block, process a whole block
                     (let ()
                         ; state[i] = state[i] ^ input-bytes[i + input-offset]
                         (set! state
                             (b-from state i
+                                ; TODO - bug, cant xor bytes in melvm, only U256
                                 (xor (b-get state i)
                                      (b-get input-bytes (+ i input-offset)))))
                         (set! state (keccak state)))
@@ -184,15 +190,18 @@
                         ; state[blocksize] = state[blocksize] ^ delimited-suffix
                         (set! state
                             (b-from state blocksize
+                                ; TODO - bug cant xor bytes in melvm, only U256
                                 (xor (b-get state blocksize)
                                      delimited-suffix)))
                         ; state[rate-in-bytes] = state[rate-in-bytes] ^ 0x80
                         (set! state
                             (b-from state blocksize
+                                ; TODO - cant xor bytes in melvm, only U256
                                 (xor (b-get state blocksize) 0x80)))
                         (set! state (keccak state))))
 
-                (set! input-offset (+ input-offset rate-in-bytes))));)
+                (set! input-offset (+ input-offset rate-in-bytes))
+                (set! i (+ i 1)))))
             ; else done processing input
             0 ; should be a noop
     );)
