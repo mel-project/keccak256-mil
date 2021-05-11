@@ -171,18 +171,34 @@
     ;(loop 10
         (if (< input-offset (b-len input-bytes))
             ; for i in 0..rate-in-bytes
-            (let (last-block? (< (+ input-offset rate-in-bytes) (b-len input-bytes))
-                  i 0)
-                (loop 136 (let ()
-                (if (not last-block?)
+            (let (not-last-block? (< (+ input-offset rate-in-bytes) (b-len input-bytes)))
+                (if not-last-block?
                     ; if not the last block, process a whole block
-                    (let ()
+                    ; 136 is the block size (rate-in-bytes)
+                    ;(let (i 0)
+                        ;(loop 136 (let ()
+                            ; state[i] = state[i] ^ input-bytes[i + input-offset]
+                            ;(set! state
+                            ;    (b-from state i
+                            ;        ; TODO - bug, cant xor bytes in melvm, only U256
+                            ;        (xor (b-get state i)
+                            ;             (b-get input-bytes (+ i input-offset)))))
+                            ;(set! i (+ i 1))))
+                    (let (tmp (u256->bytes (xor
+                                  ; u256( input-bytes[input-offset:(input-offset+rate-in-bytes)] )
+                                  (bytes->u256 (b-slice input-bytes
+                                                   input-offset
+                                                   (+ input-offset rate-in-bytes)))
+                                  ; u256( state[..rate-in-bytes] )
+                                  (bytes->u256 (b-slice state 0 rate-in-bytes)))))
+
                         ; state[i] = state[i] ^ input-bytes[i + input-offset]
-                        (set! state
-                            (b-from state i
-                                ; TODO - bug, cant xor bytes in melvm, only U256
-                                (xor (b-get state i)
-                                     (b-get input-bytes (+ i input-offset)))))
+                        (let (i 0) (loop 136 (let ()
+                            (set! state
+                                (b-from state i (b-get tmp i)))
+                            (set! i (+ i 1)))))
+
+                        ; state = keccak(state)
                         (set! state (keccak state)))
 
                     ; otherwise, process whats left of the input with padding
@@ -198,13 +214,13 @@
                             (b-from state blocksize
                                 ; TODO - cant xor bytes in melvm, only U256
                                 (xor (b-get state blocksize) 0x80)))
-                        (set! state (keccak state))))
+                        (set! state (keccak state)))
+                )
 
-                (set! input-offset (+ input-offset rate-in-bytes))
-                (set! i (+ i 1)))))
+                (set! input-offset (+ input-offset rate-in-bytes)))
             ; else done processing input
-            0 ; should be a noop
-    );)
+            0) ; should be a noop
+    ;)
 
     ; Squeeze Output
     ; ------------
